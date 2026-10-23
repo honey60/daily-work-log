@@ -114,6 +114,8 @@
     .auth-actions button, .signout-button { min-height: 42px; padding: 0 12px; border: 0; border-radius: 10px; color: white; background: var(--accent); font-size: 13px; font-weight: 650; }
     .auth-actions button:hover, .signout-button:hover { background: var(--accent-dark); }
     .auth-actions button:disabled { cursor: not-allowed; opacity: .55; }
+    #forgot-password-button { margin-top: 12px; padding: 0; border: 0; color: var(--accent); background: transparent; font-size: 12px; text-align: left; }
+    #forgot-password-button:hover { text-decoration: underline; }
     .auth-message { min-height: 18px; margin: 12px 0 0; color: #a24035; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
     .account-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 20px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.35); }
     .account-email { min-width: 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
@@ -244,6 +246,17 @@
           <button type="button" id="sign-up-button">注册新账号</button>
         </div>
       </form>
+      <button class="menu-item" id="forgot-password-button" type="button">忘记密码？发送重置邮件</button>
+      <form id="password-reset-form" hidden>
+        <div class="auth-fields">
+          <label for="new-password">新密码<input id="new-password" type="password" autocomplete="new-password" minlength="8" required></label>
+          <label for="confirm-password">确认新密码<input id="confirm-password" type="password" autocomplete="new-password" minlength="8" required></label>
+        </div>
+        <div class="auth-actions">
+          <button type="submit" id="update-password-button">保存新密码</button>
+          <button type="button" id="cancel-password-reset-button">返回登录</button>
+        </div>
+      </form>
       <p class="auth-message" id="auth-message" role="status"></p>
     </section>
 
@@ -326,6 +339,11 @@
       const authForm = document.querySelector("#auth-form");
       const signInButton = document.querySelector("#sign-in-button");
       const signUpButton = document.querySelector("#sign-up-button");
+      const forgotPasswordButton = document.querySelector("#forgot-password-button");
+      const passwordResetForm = document.querySelector("#password-reset-form");
+      const updatePasswordButton = document.querySelector("#update-password-button");
+      let recoveryMode = window.location.hash.includes("type=recovery");
+      let recoveredUser = null;
       const isConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.startsWith("PASTE_"));
       const supabase = isConfigured && window.supabase
         ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -545,6 +563,9 @@
         loadingUserId = null;
         appContent.hidden = true;
         authPanel.hidden = false;
+        authForm.hidden = false;
+        passwordResetForm.hidden = true;
+        forgotPasswordButton.hidden = false;
         authMessage.textContent = message;
         if (supabase) {
           signInButton.disabled = false;
@@ -633,7 +654,9 @@
           })
           : await supabase.auth.signInWithPassword({ email, password });
         if (result.error) {
-          authMessage.textContent = `账号操作失败：${result.error.message}`;
+          authMessage.textContent = result.error.message === "Invalid login credentials"
+            ? "邮箱或密码不正确。请检查填写，或点“忘记密码”重设密码。"
+            : `账号操作失败：${result.error.message}`;
           signInButton.disabled = false;
           signUpButton.disabled = false;
         } else if (mode === "signup" && !result.data.session) {
@@ -644,6 +667,76 @@
           await loadCloudData(result.data.session.user);
         }
       }
+
+      function showPasswordReset() {
+        recoveryMode = true;
+        authPanel.hidden = false;
+        appContent.hidden = true;
+        authForm.hidden = true;
+        forgotPasswordButton.hidden = true;
+        passwordResetForm.hidden = false;
+        authMessage.textContent = "请设置至少 8 位的新密码。";
+      }
+
+      forgotPasswordButton.addEventListener("click", async () => {
+        if (!supabase) return;
+        const emailInput = document.querySelector("#auth-email");
+        const email = emailInput.value.trim();
+        if (!emailInput.value || !emailInput.validity.valid) {
+          authMessage.textContent = "请先填写有效邮箱，再发送重置邮件。";
+          emailInput.focus();
+          return;
+        }
+        forgotPasswordButton.disabled = true;
+        authMessage.textContent = "正在发送密码重置邮件…";
+        try {
+          const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}${window.location.pathname}`
+          });
+          if (error) throw error;
+          authMessage.textContent = "如果该邮箱已注册，请查收密码重置邮件，并在此设备打开邮件链接。";
+        } catch (error) {
+          authMessage.textContent = `发送重置邮件失败：${error.message}`;
+        } finally {
+          forgotPasswordButton.disabled = false;
+        }
+      });
+
+      passwordResetForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const password = document.querySelector("#new-password").value;
+        const confirmation = document.querySelector("#confirm-password").value;
+        if (password !== confirmation) {
+          authMessage.textContent = "两次输入的新密码不一致。";
+          return;
+        }
+        if (!supabase || !recoveredUser) {
+          authMessage.textContent = "重置链接无效或已过期，请重新发送重置邮件。";
+          return;
+        }
+        updatePasswordButton.disabled = true;
+        authMessage.textContent = "正在更新密码…";
+        try {
+          const { data, error } = await supabase.auth.updateUser({ password });
+          if (error) throw error;
+          recoveryMode = false;
+          authMessage.textContent = "密码已更新，正在加载记录…";
+          await loadCloudData(data.user || recoveredUser);
+        } catch (error) {
+          authMessage.textContent = `更新密码失败：${error.message}`;
+        } finally {
+          updatePasswordButton.disabled = false;
+        }
+      });
+
+      document.querySelector("#cancel-password-reset-button").addEventListener("click", () => {
+        recoveryMode = false;
+        recoveredUser = null;
+        passwordResetForm.reset();
+        supabase.auth.signOut().then(({ error }) => {
+          showSignedOut(error ? `退出重置流程失败：${error.message}` : "");
+        }).catch((error) => showSignedOut(`退出重置流程失败：${error.message}`));
+      });
 
       authForm.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -675,7 +768,10 @@
           : "页面已准备好云端保存；在 supabase-config.js 填入公开 anon/publishable key 并发布后即可注册登录。";
       } else {
         supabase.auth.onAuthStateChange((event, session) => {
-          if (session) {
+          if (event === "PASSWORD_RECOVERY") {
+            recoveredUser = session.user;
+            setTimeout(showPasswordReset, 0);
+          } else if (session && !recoveryMode) {
             setTimeout(() => loadCloudData(session.user), 0);
           } else if (event === "SIGNED_OUT") {
             showSignedOut();
@@ -683,7 +779,10 @@
         });
         supabase.auth.getSession().then(({ data, error }) => {
           if (error) showSignedOut(`登录状态读取失败：${error.message}`);
-          else if (data.session) loadCloudData(data.session.user);
+          else if (data.session && recoveryMode) {
+            recoveredUser = data.session.user;
+            showPasswordReset();
+          } else if (data.session) loadCloudData(data.session.user);
         }).catch((error) => showSignedOut(`登录状态读取失败：${error.message}`));
       }
 
