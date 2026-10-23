@@ -29,9 +29,11 @@
       z-index: -1;
       inset: 0;
       content: "";
-      background: linear-gradient(135deg, #e9eee5, #f8f5ed 55%, #eee9df);
+      background-color: #f3f2ec;
+      background-image: linear-gradient(rgba(248, 248, 242, .2), rgba(248, 248, 242, .24)), url("default-background.png");
       background-position: center;
       background-size: cover;
+      background-attachment: fixed;
     }
     body.has-background::before { background-image: linear-gradient(rgba(248, 248, 242, .12), rgba(248, 248, 242, .18)), var(--custom-background); }
     button, input { font: inherit; }
