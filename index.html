@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f4ef">
+  <title>今日工时 · 兼职记工</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #20251f;
+      --muted: #777d73;
+      --accent: #396b50;
+      --accent-dark: #28513b;
+      --paper: rgba(255, 255, 255, .42);
+      --line: rgba(32, 37, 31, .12);
+      --shadow: 0 18px 45px rgba(31, 43, 33, .08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: #f3f2ec;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    body::before {
+      position: fixed;
+      z-index: -1;
+      inset: 0;
+      content: "";
+      background: linear-gradient(135deg, #e9eee5, #f8f5ed 55%, #eee9df);
+      background-position: center;
+      background-size: cover;
+    }
+    body.has-background::before { background-image: linear-gradient(rgba(248, 248, 242, .12), rgba(248, 248, 242, .18)), var(--custom-background); }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    .shell { width: min(1050px, calc(100% - 40px)); margin: 0 auto; padding: 44px 0 56px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 36px; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark { display: grid; width: 43px; height: 43px; place-items: center; border-radius: 14px; color: white; background: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+    .brand h1 { margin: 0; font-size: 18px; letter-spacing: .02em; }
+    .brand p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    #background-file { display: none; }
+    .settings-menu { position: relative; }
+    .menu-trigger {
+      display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid var(--line);
+      border-radius: 12px; color: var(--ink); background: rgba(255,255,255,.68); font-size: 24px; line-height: 1;
+    }
+    .menu-trigger:hover, .menu-trigger[aria-expanded="true"] { background: white; }
+    .menu-panel {
+      position: absolute; z-index: 10; top: calc(100% + 8px); right: 0; display: grid; gap: 4px;
+      min-width: 154px; padding: 6px; border: 1px solid var(--line); border-radius: 12px;
+      background: rgba(255,255,255,.88); box-shadow: 0 12px 30px rgba(31,43,33,.14);
+      backdrop-filter: blur(14px);
+    }
+    .menu-panel[hidden] { display: none; }
+    .menu-panel .menu-item {
+      display: flex; width: 100%; min-height: 40px; align-items: center; justify-content: flex-start;
+      padding: 0 10px; border: 0; border-radius: 8px; color: var(--ink); background: transparent;
+      font-size: 13px; text-align: left; cursor: pointer;
+    }
+    .menu-panel .menu-item[hidden] { display: none; }
+    .menu-panel .menu-item:hover { background: #f2f5ef; }
+    .intro { margin-bottom: 23px; }
+    .eyebrow { margin: 0 0 9px; color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .14em; }
+    .intro h2 { margin: 0; font-size: clamp(26px, 4vw, 36px); letter-spacing: -.04em; }
+    .intro > p:last-child { margin: 10px 0 0; color: var(--muted); font-size: 14px; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 19px; }
+    .stat, .panel { border: 1px solid rgba(255,255,255,.58); border-radius: 18px; background: var(--paper); box-shadow: var(--shadow); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+    .stat { min-height: 110px; padding: 19px 21px; text-align: center; }
+    .stat-label { color: var(--muted); font-size: 12px; }
+    .stat-value { margin-top: 10px; font-size: 27px; font-weight: 700; letter-spacing: -.04em; }
+    .stat-value small { margin-left: 4px; color: var(--ink); font-size: 13px; font-weight: 700; letter-spacing: 0; }
+    .content { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+    .panel { padding: 23px; }
+    .panel-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 21px; }
+    .panel-heading h3 { margin: 0; font-size: 16px; }
+    .panel-heading span { color: var(--muted); font-size: 12px; }
+    .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 15px 12px; }
+    .field { min-width: 0; }
+    .field.date-field { grid-column: 1 / -1; }
+    .field label { display: block; margin-bottom: 7px; color: #555d53; font-size: 12px; font-weight: 600; }
+    .field input[type="date"], .field input[type="time"] {
+      width: 100%; height: 44px; padding: 0 11px; border: 1px solid var(--line); border-radius: 10px;
+      outline: none; color: var(--ink); background: rgba(255,255,255,.28);
+    }
+    .field input:focus { border-color: #6b9879; box-shadow: 0 0 0 3px rgba(57,107,80,.1); }
+    .meal-option {
+      display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px;
+      grid-column: 1 / -1;
+      border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.24);
+      color: #424940; font-size: 13px; cursor: pointer;
+    }
+    .meal-option input { width: 16px; height: 16px; accent-color: var(--accent); }
+    .meal-option span { flex: 1; }
+    .meal-option small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .preview { display: flex; justify-content: space-between; gap: 12px; margin: 17px 0; padding: 13px 14px; border: 1px solid rgba(255,255,255,.3); border-radius: 11px; background: rgba(242,245,239,.32); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+    .preview div { display: grid; gap: 5px; }
+    .preview span { color: var(--muted); font-size: 11px; }
+    .preview strong { font-size: 15px; }
+    .save-button { width: 100%; height: 46px; border: 0; border-radius: 11px; color: white; background: var(--accent); font-weight: 650; transition: background .2s, transform .2s; }
+    .save-button:hover { background: var(--accent-dark); transform: translateY(-1px); }
+    .save-button:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid rgba(57,107,80,.3); outline-offset: 2px; }
+    .message { min-height: 18px; margin: 10px 0 0; color: #a24035; font-size: 12px; }
+    .records { display: grid; gap: 10px; }
+    .record { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--line); }
+    .record:last-child { border-bottom: 0; }
+    .record-main { min-width: 0; }
+    .record-date { font-size: 13px; font-weight: 650; }
+    .record-detail { margin-top: 6px; color: var(--muted); font-size: 11px; }
+    .record-right { display: flex; align-items: center; gap: 12px; }
+    .record-total { text-align: right; white-space: nowrap; }
+    .record-total strong { display: block; font-size: 14px; }
+    .record-total small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
+    .delete-button { width: 30px; height: 30px; border: 0; border-radius: 8px; color: #8c918b; background: transparent; font-size: 18px; }
+    .delete-button:hover { color: #a24035; background: #fbefed; }
+    .empty { padding: 50px 10px; color: var(--muted); text-align: center; font-size: 13px; }
+    .empty-icon { margin-bottom: 10px; font-size: 26px; }
+    .footer { margin-top: 20px; color: var(--muted); text-align: center; font-size: 11px; }
+    @media (max-width: 720px) {
+      .shell { width: min(540px, calc(100% - 32px)); padding: 20px 0 30px; }
+      header { margin-bottom: 25px; }
+      .brand { gap: 10px; }
+      .brand-mark { width: 40px; height: 40px; }
+      .intro { margin-bottom: 18px; }
+      .eyebrow { margin-bottom: 6px; }
+      .intro h2 { font-size: clamp(23px, 6.5vw, 28px); }
+      .intro > p:last-child { margin-top: 8px; font-size: 13px; }
+      .stats { gap: 8px; margin-bottom: 14px; }
+      .stat, .panel { border-radius: 15px; }
+      .stat { min-height: 84px; padding: 12px 9px; }
+      .stat-label { font-size: 11px; }
+      .stat-value { margin-top: 8px; font-size: 18px; }
+      .stat-value small { margin-left: 2px; font-size: 11px; }
+      .content { grid-template-columns: 1fr; }
+      .content { gap: 14px; }
+      .panel { padding: 18px; }
+      .panel-heading { margin-bottom: 16px; }
+      .fields { gap: 13px 10px; }
+      .preview { margin: 14px 0; }
+      .records { gap: 4px; }
+      .record { padding: 12px 0; }
+      .empty { padding: 26px 10px; }
+      .footer { margin-top: 16px; line-height: 1.6; }
+    }
+    @media (max-width: 375px) {
+      .brand p { font-size: 11px; }
+      .background-button { padding: 0 10px; font-size: 12px; }
+      .meal-option { gap: 6px; padding: 0 8px; }
+      .meal-option small { font-size: 10px; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .stat:first-child { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 14px; }
+      .stat:first-child .stat-value { margin-top: 0; }
+    }
+    .cycle-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 14px;
+      margin: 22px 0 18px; padding: 14px 17px; border: 1px solid rgba(255,255,255,.58);
+      border-radius: 14px; background: var(--paper); box-shadow: var(--shadow);
+      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    }
+    .cycle-copy strong { display: block; font-size: 13px; }
+    .cycle-copy small { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; }
+    .settle-button {
+      flex: 0 0 auto; min-height: 38px; padding: 0 13px; border: 0; border-radius: 10px;
+      color: white; background: var(--accent); font-size: 12px; font-weight: 650;
+    }
+    .settle-button:hover:not(:disabled) { background: var(--accent-dark); }
+    .settle-button:disabled { cursor: not-allowed; color: #8b9189; background: #e9ebe7; }
+    .settlement-history {
+      margin-top: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,.58);
+      border-radius: 15px; background: var(--paper); box-shadow: var(--shadow);
+      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    }
+    .settlement-history > summary {
+      display: flex; align-items: center; justify-content: space-between; min-height: 52px;
+      padding: 0 18px; cursor: pointer; font-size: 13px; font-weight: 650; list-style: none;
+    }
+    .settlement-history > summary::-webkit-details-marker { display: none; }
+    .settlement-history > summary::after { content: "+"; margin-left: auto; padding-left: 10px; color: var(--muted); font-size: 17px; }
+    .settlement-history[open] > summary::after { content: "−"; }
+    .settlement-history > summary small { margin-left: 8px; color: var(--muted); font-size: 11px; font-weight: 400; }
+    .settlement-list { padding: 0 18px 12px; }
+    .settlement { padding: 12px 0; border-top: 1px solid var(--line); }
+    .settlement > summary { display: flex; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
+    .settlement > summary::-webkit-details-marker { display: none; }
+    .settlement-period { font-size: 12px; font-weight: 650; }
+    .settlement-meta { margin-top: 5px; color: var(--muted); font-size: 11px; }
+    .settlement-pay { white-space: nowrap; font-size: 13px; font-weight: 700; }
+    .settlement .record { padding: 10px 0; }
+    .settlement .delete-button { display: none; }
+    .settlement-empty { padding: 16px 0 8px; color: var(--muted); font-size: 12px; }
+    @media (max-width: 720px) {
+      .cycle-bar { align-items: flex-start; margin-bottom: 14px; padding: 13px; }
+      .cycle-copy small { max-width: 190px; line-height: 1.5; }
+      .settle-button { min-height: 40px; }
+      .settlement-history { margin-top: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand">
+        <div class="brand-mark" aria-label="吴蕴涵">吴蕴涵</div>
+        <div><h1>今日工时</h1><p>认真记录每一份付出</p></div>
+      </div>
+      <div class="settings-menu">
+        <button class="menu-trigger" id="menu-trigger" type="button" aria-label="更多设置" aria-expanded="false" aria-controls="background-menu">⋯</button>
+        <div class="menu-panel" id="background-menu" hidden>
+          <label class="menu-item" for="background-file">更换背景</label>
+          <input id="background-file" type="file" accept="image/*" aria-label="上传自定义背景图片">
+          <button class="menu-item" id="reset-background" type="button" hidden>恢复默认背景</button>
+        </div>
+      </div>
+    </header>
+
+    <section class="intro">
+      <p class="eyebrow">WORK LOG</p>
+      <h2>把每一小时，都记下来。</h2>
+      <p>记录上下班时间，工时和工资自动为你算好。</p>
+    </section>
+
+    <section class="stats" aria-label="累计统计">
+      <article class="stat"><div class="stat-label">累计工时</div><div class="stat-value" id="total-hours">0小时<small>0分钟</small></div></article>
+      <article class="stat"><div class="stat-label">累计工资</div><div class="stat-value" id="total-pay">¥0.00</div></article>
+      <article class="stat"><div class="stat-label">记录天数</div><div class="stat-value" id="total-days">0<small>天</small></div></article>
+    </section>
+
+    <div class="content">
+      <section class="panel">
+        <div class="panel-heading"><h3>记一笔工时</h3><span>时薪 ¥15 / 小时</span></div>
+        <form id="work-form" novalidate>
+          <div class="fields">
+            <div class="field date-field"><label for="work-date">工作日期</label><input id="work-date" name="date" type="date" required></div>
+            <div class="field"><label for="start-time">上班时间</label><input id="start-time" name="start" type="time" required></div>
+            <div class="field"><label for="end-time">下班时间</label><input id="end-time" name="end" type="time" required></div>
+            <label class="meal-option" for="meal">
+              <input id="meal" name="meal" type="checkbox">
+              <span>今天吃饭了</span>
+              <small>扣 30 分钟</small>
+            </label>
+          </div>
+          <div class="preview" aria-live="polite">
+            <div><span>今日净工时</span><strong id="preview-hours">—</strong></div>
+            <div><span>预计工资</span><strong id="preview-pay">—</strong></div>
+          </div>
+          <button class="save-button" type="submit">保存今日记录</button>
+          <p class="message" id="form-message" role="status"></p>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading"><h3>工时记录</h3><span id="record-count">共 0 条</span></div>
+        <div class="records" id="records"></div>
+      </section>
+    </div>
+    <section class="cycle-bar" aria-label="结算当前周期">
+      <div class="cycle-copy"><strong>当前结算周期</strong><small>结算后保存本期记录，并从零开始累计</small></div>
+      <button class="settle-button" id="settle-button" type="button" disabled>结算本期</button>
+    </section>
+    <details class="settlement-history">
+      <summary><span>历史结算</span><small id="settlement-count">0 期</small></summary>
+      <div class="settlement-list" id="settlement-list"></div>
+    </details>
+    <footer class="footer">工时按实际时长计算 · 用餐扣除 30 分钟 · 数据仅保存在当前浏览器</footer>
+  </main>
+
+  <script>
+    (() => {
+      const HOURLY_RATE = 15;
+      const STORAGE_KEY = "daily-work-data-v2";
+      const LEGACY_STORAGE_KEY = "daily-work-records-v1";
+      const BACKGROUND_DB = "daily-work-background-v1";
+      const form = document.querySelector("#work-form");
+      const dateInput = document.querySelector("#work-date");
+      const startInput = document.querySelector("#start-time");
+      const endInput = document.querySelector("#end-time");
+      const mealInput = document.querySelector("#meal");
+      const recordsElement = document.querySelector("#records");
+      const messageElement = document.querySelector("#form-message");
+
+      const today = new Date();
+      dateInput.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+      function readData() {
+        try {
+          const savedData = localStorage.getItem(STORAGE_KEY);
+          if (savedData) {
+            const data = JSON.parse(savedData);
+            if (!Array.isArray(data.records) || !Array.isArray(data.settlements)) throw new Error("工时数据格式不正确。");
+            return data;
+          }
+          const legacyRecords = JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY) || "[]");
+          if (!Array.isArray(legacyRecords)) throw new Error("旧版工时记录格式不正确。");
+          return { records: legacyRecords, settlements: [] };
+        } catch (error) {
+          messageElement.textContent = `读取记录失败：${error.message}`;
+          return { records: [], settlements: [] };
+        }
+      }
+
+      let { records, settlements } = readData();
+
+      function formatDuration(minutes) {
+        const hours = Math.floor(minutes / 60);
+        const remainder = minutes % 60;
+        return `${hours}小时${remainder}分钟`;
+      }
+
+      function shiftMinutes(start, end, meal) {
+        const [startHour, startMinute] = start.split(":").map(Number);
+        const [endHour, endMinute] = end.split(":").map(Number);
+        let duration = endHour * 60 + endMinute - (startHour * 60 + startMinute);
+        if (duration < 0) duration += 24 * 60;
+        return duration - (meal ? 30 : 0);
+      }
+
+      function calculate() {
+        if (!startInput.value || !endInput.value) return null;
+        const gross = shiftMinutes(startInput.value, endInput.value, false);
+        if (gross === 0) return null;
+        return Math.max(0, gross - (mealInput.checked ? 30 : 0));
+      }
+
+      function updatePreview() {
+        const minutes = calculate();
+        document.querySelector("#preview-hours").textContent = minutes === null ? "—" : formatDuration(minutes);
+        document.querySelector("#preview-pay").textContent = minutes === null ? "—" : `¥${(minutes / 60 * HOURLY_RATE).toFixed(2)}`;
+      }
+
+      function formatDate(date) {
+        const [year, month, day] = date.split("-");
+        return `${year}年${Number(month)}月${Number(day)}日`;
+      }
+
+      function createRecordRow(record, allowDelete) {
+        const row = document.createElement("article");
+        row.className = "record";
+        const main = document.createElement("div");
+        main.className = "record-main";
+        const day = document.createElement("div");
+        day.className = "record-date";
+        day.textContent = formatDate(record.date);
+        const detail = document.createElement("div");
+        detail.className = "record-detail";
+        detail.textContent = `${record.start} — ${record.end}${record.end < record.start ? "（次日）" : ""} · ${record.meal ? "已用餐，扣30分钟" : "未用餐"}`;
+        main.append(day, detail);
+
+        const right = document.createElement("div");
+        right.className = "record-right";
+        const total = document.createElement("div");
+        total.className = "record-total";
+        const hours = document.createElement("strong");
+        hours.textContent = formatDuration(record.minutes);
+        const pay = document.createElement("small");
+        pay.textContent = `¥${(record.minutes / 60 * HOURLY_RATE).toFixed(2)}`;
+        total.append(hours, pay);
+        right.append(total);
+
+        if (allowDelete) {
+          const remove = document.createElement("button");
+          remove.className = "delete-button";
+          remove.type = "button";
+          remove.setAttribute("aria-label", `删除${formatDate(record.date)}的记录`);
+          remove.textContent = "×";
+          remove.addEventListener("click", () => {
+            saveRecords(records.filter((item) => item.date !== record.date));
+          });
+          right.append(remove);
+        }
+
+        row.append(main, right);
+        return row;
+      }
+
+      function renderSettlements() {
+        const list = document.querySelector("#settlement-list");
+        document.querySelector("#settlement-count").textContent = `${settlements.length} 期`;
+        list.replaceChildren();
+        if (settlements.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "settlement-empty";
+          empty.textContent = "结算后的工时记录会保存在这里。";
+          list.append(empty);
+          return;
+        }
+
+        settlements.forEach((settlement) => {
+          const period = document.createElement("details");
+          period.className = "settlement";
+          const summary = document.createElement("summary");
+          const info = document.createElement("div");
+          const dates = settlement.records.map((record) => record.date).sort();
+          const startDate = dates[0];
+          const endDate = dates[dates.length - 1];
+          const range = document.createElement("div");
+          range.className = "settlement-period";
+          range.textContent = startDate === endDate ? formatDate(startDate) : `${formatDate(startDate)} — ${formatDate(endDate)}`;
+          const meta = document.createElement("div");
+          meta.className = "settlement-meta";
+          meta.textContent = `${settlement.records.length} 天 · ${formatDuration(settlement.minutes)} · 结算于 ${formatDate(settlement.settledAt)}`;
+          info.append(range, meta);
+          const pay = document.createElement("div");
+          pay.className = "settlement-pay";
+          pay.textContent = `¥${(settlement.minutes / 60 * HOURLY_RATE).toFixed(2)}`;
+          summary.append(info, pay);
+          period.append(summary);
+          settlement.records.slice().sort((a, b) => b.date.localeCompare(a.date)).forEach((record) => {
+            period.append(createRecordRow(record, false));
+          });
+          list.append(period);
+        });
+      }
+
+      function render() {
+        records.sort((a, b) => b.date.localeCompare(a.date));
+        const totalMinutes = records.reduce((sum, record) => sum + record.minutes, 0);
+        const totalHours = document.querySelector("#total-hours");
+        totalHours.replaceChildren(document.createTextNode(`${Math.floor(totalMinutes / 60)}小时`));
+        if (totalMinutes % 60 !== 0) {
+          const remainder = document.createElement("small");
+          remainder.textContent = `${totalMinutes % 60}分钟`;
+          totalHours.append(remainder);
+        }
+        document.querySelector("#total-pay").textContent = `¥${(totalMinutes / 60 * HOURLY_RATE).toFixed(2)}`;
+        document.querySelector("#total-days").innerHTML = `${records.length}<small>天</small>`;
+        document.querySelector("#record-count").textContent = `共 ${records.length} 条`;
+        document.querySelector("#settle-button").disabled = records.length === 0;
+        recordsElement.replaceChildren();
+        renderSettlements();
+
+        if (records.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "empty";
+          empty.innerHTML = '<div class="empty-icon" aria-hidden="true">☀</div><div>还没有工时记录<br>保存后会显示在这里</div>';
+          recordsElement.append(empty);
+          return;
+        }
+
+        records.forEach((record) => {
+          recordsElement.append(createRecordRow(record, true));
+        });
+      }
+
+      function saveRecords(nextRecords, nextSettlements = settlements) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ records: nextRecords, settlements: nextSettlements }));
+          records = nextRecords;
+          settlements = nextSettlements;
+          messageElement.textContent = "";
+          render();
+          return true;
+        } catch (error) {
+          messageElement.textContent = `保存失败：${error.message}`;
+          return false;
+        }
+      }
+
+      [startInput, endInput, mealInput].forEach((input) => input.addEventListener("input", updatePreview));
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        messageElement.textContent = "";
+        if (!dateInput.value || !startInput.value || !endInput.value) {
+          messageElement.textContent = "请填写工作日期、上班时间和下班时间。";
+          return;
+        }
+        const gross = shiftMinutes(startInput.value, endInput.value, false);
+        if (gross === 0) {
+          messageElement.textContent = "上下班时间不能相同，请检查填写是否正确。";
+          return;
+        }
+        const minutes = Math.max(0, gross - (mealInput.checked ? 30 : 0));
+        const existing = records.some((record) => record.date === dateInput.value);
+        if (existing && !window.confirm("这一天已有记录，保存后会替换原记录。要继续吗？")) return;
+        const nextRecords = records.filter((record) => record.date !== dateInput.value);
+        nextRecords.push({ date: dateInput.value, start: startInput.value, end: endInput.value, meal: mealInput.checked, minutes });
+        if (!saveRecords(nextRecords)) return;
+        startInput.value = "";
+        endInput.value = "";
+        mealInput.checked = false;
+        updatePreview();
+      });
+
+      document.querySelector("#settle-button").addEventListener("click", () => {
+        if (records.length === 0) return;
+        const totalMinutes = records.reduce((sum, record) => sum + record.minutes, 0);
+        const totalPay = (totalMinutes / 60 * HOURLY_RATE).toFixed(2);
+        if (!window.confirm(`确认结算本期 ${records.length} 天，合计 ${formatDuration(totalMinutes)}、工资 ¥${totalPay}？\n确认后本期会存入历史结算，当前累计将清零。`)) return;
+        const todayDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+        const settlement = { settledAt: todayDate, minutes: totalMinutes, records: records.slice() };
+        if (saveRecords([], [settlement, ...settlements])) {
+          document.querySelector(".settlement-history").open = true;
+          messageElement.textContent = "本期已结算并保存，已开始新一轮记录。";
+        }
+      });
+
+      function openBackgroundDb() {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open(BACKGROUND_DB, 1);
+          request.onupgradeneeded = () => request.result.createObjectStore("settings");
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error || new Error("无法打开背景图片存储。"));
+        });
+      }
+
+      async function setBackground(blob) {
+        const db = await openBackgroundDb();
+        await new Promise((resolve, reject) => {
+          const transaction = db.transaction("settings", "readwrite");
+          transaction.objectStore("settings").put(blob, "background");
+          transaction.oncomplete = resolve;
+          transaction.onerror = () => reject(transaction.error || new Error("无法保存背景图片。"));
+          transaction.onabort = () => reject(transaction.error || new Error("背景图片保存已取消。"));
+        });
+        db.close();
+        applyBackground(blob);
+      }
+
+      function closeSettingsMenu() {
+        document.querySelector("#background-menu").hidden = true;
+        document.querySelector("#menu-trigger").setAttribute("aria-expanded", "false");
+      }
+
+      document.querySelector("#menu-trigger").addEventListener("click", () => {
+        const menu = document.querySelector("#background-menu");
+        menu.hidden = !menu.hidden;
+        document.querySelector("#menu-trigger").setAttribute("aria-expanded", String(!menu.hidden));
+      });
+
+      document.addEventListener("click", (event) => {
+        if (!event.target.closest(".settings-menu")) closeSettingsMenu();
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") closeSettingsMenu();
+      });
+
+      function applyBackground(blob) {
+        if (!blob) return;
+        const imageUrl = URL.createObjectURL(blob);
+        document.body.style.setProperty("--custom-background", `url("${imageUrl}")`);
+        document.body.classList.add("has-background");
+        document.querySelector("#reset-background").hidden = false;
+      }
+
+      async function loadBackground() {
+        try {
+          const db = await openBackgroundDb();
+          const request = db.transaction("settings", "readonly").objectStore("settings").get("background");
+          request.onsuccess = () => { applyBackground(request.result); db.close(); };
+          request.onerror = () => { db.close(); messageElement.textContent = "读取自定义背景失败。"; };
+        } catch (error) {
+          messageElement.textContent = `读取自定义背景失败：${error.message}`;
+        }
+      }
+
+      document.querySelector("#background-file").addEventListener("change", async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) {
+          messageElement.textContent = "请选择图片文件作为背景。";
+          event.target.value = "";
+          return;
+        }
+        try {
+          await setBackground(file);
+          messageElement.textContent = "";
+          closeSettingsMenu();
+        } catch (error) {
+          messageElement.textContent = `更换背景失败：${error.message}`;
+        }
+        event.target.value = "";
+      });
+
+      document.querySelector("#reset-background").addEventListener("click", async () => {
+        try {
+          const db = await openBackgroundDb();
+          await new Promise((resolve, reject) => {
+            const transaction = db.transaction("settings", "readwrite");
+            transaction.objectStore("settings").delete("background");
+            transaction.oncomplete = resolve;
+            transaction.onerror = () => reject(transaction.error || new Error("无法删除背景图片。"));
+          });
+          db.close();
+          document.body.classList.remove("has-background");
+          document.body.style.removeProperty("--custom-background");
+          document.querySelector("#reset-background").hidden = true;
+          messageElement.textContent = "";
+          closeSettingsMenu();
+        } catch (error) {
+          messageElement.textContent = `恢复默认背景失败：${error.message}`;
+        }
+      });
+
+      render();
+      updatePreview();
+      loadBackground();
+    })();
+  </script>
+</body>
+</html>
