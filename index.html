@@ -138,6 +138,12 @@
     .record-menu button { min-height: 36px; padding: 0 10px; border: 0; border-radius: 7px; color: var(--ink); background: transparent; font-size: 12px; text-align: left; }
     .record-menu button:hover { background: #f2f5ef; }
     .record-menu .record-delete-action { color: #a24035; }
+    .older-records { margin-top: 8px; border-top: 1px solid var(--line); }
+    .older-records > summary { padding: 13px 0 3px; color: var(--accent); cursor: pointer; font-size: 12px; font-weight: 600; list-style: none; }
+    .older-records > summary::-webkit-details-marker { display: none; }
+    .older-records > summary::after { content: "+"; float: right; color: var(--muted); font-size: 16px; font-weight: 400; }
+    .older-records[open] > summary::after { content: "−"; }
+    .older-record-list { display: grid; gap: 4px; }
     .record-total { text-align: right; white-space: nowrap; }
     .record-total strong { display: block; font-size: 14px; }
     .record-total small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
@@ -145,14 +151,17 @@
     .empty { padding: 50px 10px; color: var(--muted); text-align: center; font-size: 13px; }
     .empty-icon { margin-bottom: 10px; font-size: 26px; }
     .footer { margin-top: 20px; color: var(--muted); text-align: center; font-size: 11px; }
+    .backup-help { margin: -10px 0 18px; color: var(--muted); text-align: center; font-size: 11px; }
     @media (max-width: 720px) {
       .shell { width: min(540px, calc(100% - 32px)); padding: 20px 0 30px; }
       header { margin-bottom: 25px; }
       .brand { gap: 10px; }
       .brand-mark { width: 40px; height: 40px; }
-      .account-bar { align-items: stretch; flex-direction: column; gap: 10px; margin-bottom: 17px; }
-      .account-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
-      .account-actions .backup-button, .account-actions .signout-button { min-width: 0; padding: 0 6px; font-size: 11px; white-space: nowrap; }
+      .account-bar { align-items: center; flex-direction: row; gap: 8px; margin-bottom: 12px; padding: 7px 9px; }
+      .account-email { max-width: 90px; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+      .account-actions { display: flex; gap: 5px; }
+      .account-actions .backup-button, .account-actions .signout-button { min-height: 31px; padding: 0 7px; font-size: 10px; white-space: nowrap; }
+      .backup-help { margin: -5px 0 16px; font-size: 10px; }
       .intro { margin-bottom: 18px; }
       .eyebrow { margin-bottom: 6px; }
       .intro h2 { font-size: clamp(23px, 6.5vw, 28px); }
@@ -286,7 +295,7 @@
         <button class="signout-button" id="sign-out-button" type="button">退出登录</button>
       </div>
     </div>
-    <p class="footer" style="margin: -10px 0 18px;">建议定期点“下载备份”，将 JSON 文件保存到电脑或网盘。</p>
+    <p class="backup-help">建议定期点“下载备份”，将 JSON 文件保存到电脑或网盘。</p>
     <section class="intro">
       <p class="eyebrow">WORK LOG</p>
       <h2>把每一小时，都记下来。</h2>
@@ -600,9 +609,20 @@
           return;
         }
 
-        records.forEach((record) => {
+        records.slice(0, 5).forEach((record) => {
           recordsElement.append(createRecordRow(record, true));
         });
+        if (records.length > 5) {
+          const olderRecords = document.createElement("details");
+          olderRecords.className = "older-records";
+          const summary = document.createElement("summary");
+          summary.textContent = `更早记录（${records.length - 5} 条）`;
+          const olderList = document.createElement("div");
+          olderList.className = "older-record-list";
+          records.slice(5).forEach((record) => olderList.append(createRecordRow(record, true)));
+          olderRecords.append(summary, olderList);
+          recordsElement.append(olderRecords);
+        }
       }
 
       function cacheData(nextRecords, nextSettlements) {
