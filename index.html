@@ -127,11 +127,15 @@
     .record-date { font-size: 13px; font-weight: 650; }
     .record-detail { margin-top: 6px; color: var(--muted); font-size: 11px; }
     .record-right { display: flex; align-items: center; gap: 12px; }
+    .record-actions { display: flex; align-items: center; gap: 4px; }
     .record-total { text-align: right; white-space: nowrap; }
     .record-total strong { display: block; font-size: 14px; }
     .record-total small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
     .delete-button { width: 30px; height: 30px; border: 0; border-radius: 8px; color: #8c918b; background: transparent; font-size: 18px; }
     .delete-button:hover { color: #a24035; background: #fbefed; }
+    .edit-button { min-height: 32px; padding: 0 9px; border: 0; border-radius: 8px; color: var(--accent); background: rgba(57,107,80,.08); font-size: 12px; }
+    .edit-button:hover { background: rgba(57,107,80,.15); }
+    .cancel-edit-button { width: 100%; min-height: 40px; margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: rgba(255,255,255,.45); }
     .empty { padding: 50px 10px; color: var(--muted); text-align: center; font-size: 13px; }
     .empty-icon { margin-bottom: 10px; font-size: 26px; }
     .footer { margin-top: 20px; color: var(--muted); text-align: center; font-size: 11px; }
@@ -276,7 +280,7 @@
 
     <div class="content">
       <section class="panel">
-        <div class="panel-heading"><h3>记一笔工时</h3><span>时薪 ¥15 / 小时</span></div>
+        <div class="panel-heading"><h3 id="form-heading">记一笔工时</h3><span>时薪 ¥15 / 小时</span></div>
         <form id="work-form" novalidate>
           <div class="fields">
             <div class="field date-field"><label for="work-date">工作日期</label><input id="work-date" name="date" type="date" required></div>
@@ -293,6 +297,7 @@
             <div><span>预计工资</span><strong id="preview-pay">—</strong></div>
           </div>
           <button class="save-button" type="submit">保存今日记录</button>
+          <button class="cancel-edit-button" id="cancel-edit-button" type="button" hidden>取消编辑</button>
           <p class="message" id="form-message" role="status"></p>
         </form>
       </section>
@@ -333,6 +338,9 @@
       const mealInput = document.querySelector("#meal");
       const recordsElement = document.querySelector("#records");
       const messageElement = document.querySelector("#form-message");
+      const saveButton = form.querySelector(".save-button");
+      const cancelEditButton = document.querySelector("#cancel-edit-button");
+      let editingDate = null;
       const authPanel = document.querySelector("#auth-panel");
       const authMessage = document.querySelector("#auth-message");
       const appContent = document.querySelector("#app-content");
@@ -405,6 +413,31 @@
         return `${year}年${Number(month)}月${Number(day)}日`;
       }
 
+      function clearEditing() {
+        editingDate = null;
+        form.reset();
+        dateInput.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+        document.querySelector("#form-heading").textContent = "记一笔工时";
+        saveButton.textContent = "保存今日记录";
+        cancelEditButton.hidden = true;
+        updatePreview();
+      }
+
+      function editRecord(record) {
+        editingDate = record.date;
+        dateInput.value = record.date;
+        startInput.value = record.start;
+        endInput.value = record.end;
+        mealInput.checked = record.meal;
+        document.querySelector("#form-heading").textContent = `编辑 ${formatDate(record.date)}`;
+        saveButton.textContent = "保存修改";
+        cancelEditButton.hidden = false;
+        messageElement.textContent = "";
+        updatePreview();
+        form.scrollIntoView({ behavior: "smooth", block: "center" });
+        dateInput.focus({ preventScroll: true });
+      }
+
       function createRecordRow(record, allowDelete) {
         const row = document.createElement("article");
         row.className = "record";
@@ -430,15 +463,26 @@
         right.append(total);
 
         if (allowDelete) {
+          const actions = document.createElement("div");
+          actions.className = "record-actions";
+          const edit = document.createElement("button");
+          edit.className = "edit-button";
+          edit.type = "button";
+          edit.textContent = "编辑";
+          edit.setAttribute("aria-label", `编辑${formatDate(record.date)}的记录`);
+          edit.addEventListener("click", () => editRecord(record));
           const remove = document.createElement("button");
           remove.className = "delete-button";
           remove.type = "button";
           remove.setAttribute("aria-label", `删除${formatDate(record.date)}的记录`);
           remove.textContent = "×";
           remove.addEventListener("click", async () => {
-            await saveRecords(records.filter((item) => item.date !== record.date));
+            if (await saveRecords(records.filter((item) => item.date !== record.date)) && editingDate === record.date) {
+              clearEditing();
+            }
           });
-          right.append(remove);
+          actions.append(edit, remove);
+          right.append(actions);
         }
 
         row.append(main, right);
@@ -790,6 +834,10 @@
       }
 
       [startInput, endInput, mealInput].forEach((input) => input.addEventListener("input", updatePreview));
+      cancelEditButton.addEventListener("click", () => {
+        clearEditing();
+        messageElement.textContent = "";
+      });
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         messageElement.textContent = "";
@@ -803,15 +851,12 @@
           return;
         }
         const minutes = Math.max(0, gross - (mealInput.checked ? 30 : 0));
-        const existing = records.some((record) => record.date === dateInput.value);
+        const existing = records.some((record) => record.date === dateInput.value && record.date !== editingDate);
         if (existing && !window.confirm("这一天已有记录，保存后会替换原记录。要继续吗？")) return;
-        const nextRecords = records.filter((record) => record.date !== dateInput.value);
+        const nextRecords = records.filter((record) => record.date !== dateInput.value && record.date !== editingDate);
         nextRecords.push({ date: dateInput.value, start: startInput.value, end: endInput.value, meal: mealInput.checked, minutes });
         if (!await saveRecords(nextRecords)) return;
-        startInput.value = "";
-        endInput.value = "";
-        mealInput.checked = false;
-        updatePreview();
+        clearEditing();
       });
 
       document.querySelector("#settle-button").addEventListener("click", async () => {
