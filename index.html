@@ -104,6 +104,20 @@
     .save-button:hover { background: var(--accent-dark); transform: translateY(-1px); }
     .save-button:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid rgba(57,107,80,.3); outline-offset: 2px; }
     .message { min-height: 18px; margin: 10px 0 0; color: #a24035; font-size: 12px; }
+    .auth-panel { max-width: 460px; margin: 0 auto 24px; padding: 22px; border: 1px solid rgba(255,255,255,.58); border-radius: 18px; background: var(--paper); box-shadow: var(--shadow); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+    .auth-panel h2 { margin: 0 0 8px; font-size: 18px; }
+    .auth-help { margin: 0 0 17px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    .auth-fields { display: grid; gap: 12px; }
+    .auth-fields label { display: grid; gap: 6px; color: #555d53; font-size: 12px; font-weight: 600; }
+    .auth-fields input { width: 100%; height: 44px; padding: 0 11px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: rgba(255,255,255,.4); }
+    .auth-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 14px; }
+    .auth-actions button, .signout-button { min-height: 42px; padding: 0 12px; border: 0; border-radius: 10px; color: white; background: var(--accent); font-size: 13px; font-weight: 650; }
+    .auth-actions button:hover, .signout-button:hover { background: var(--accent-dark); }
+    .auth-actions button:disabled { cursor: not-allowed; opacity: .55; }
+    .auth-message { min-height: 18px; margin: 12px 0 0; color: #a24035; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+    .account-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 20px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.35); }
+    .account-email { min-width: 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+    .signout-button { flex: 0 0 auto; min-height: 34px; font-size: 12px; }
     .records { display: grid; gap: 10px; }
     .record { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--line); }
     .record:last-child { border-bottom: 0; }
@@ -137,6 +151,7 @@
       .content { grid-template-columns: 1fr; }
       .content { gap: 14px; }
       .panel { padding: 18px; }
+      .auth-panel { padding: 18px; border-radius: 15px; }
       .panel-heading { margin-bottom: 16px; }
       .fields { gap: 13px 10px; }
       .preview { margin: 14px 0; }
@@ -216,6 +231,24 @@
       </div>
     </header>
 
+    <section class="auth-panel" id="auth-panel">
+      <h2>登录后同步保存</h2>
+      <p class="auth-help">使用同一个账号，可在手机和电脑查看同一份工时记录。</p>
+      <form id="auth-form">
+        <div class="auth-fields">
+          <label for="auth-email">邮箱<input id="auth-email" type="email" autocomplete="email" required></label>
+          <label for="auth-password">密码<input id="auth-password" type="password" autocomplete="current-password" minlength="8" required></label>
+        </div>
+        <div class="auth-actions">
+          <button type="submit" id="sign-in-button">登录</button>
+          <button type="button" id="sign-up-button">注册新账号</button>
+        </div>
+      </form>
+      <p class="auth-message" id="auth-message" role="status"></p>
+    </section>
+
+    <div id="app-content" hidden>
+    <div class="account-bar"><span class="account-email" id="account-email"></span><button class="signout-button" id="sign-out-button" type="button">退出登录</button></div>
     <section class="intro">
       <p class="eyebrow">WORK LOG</p>
       <h2>把每一小时，都记下来。</h2>
@@ -264,15 +297,22 @@
       <summary><span>历史结算</span><small id="settlement-count">0 期</small></summary>
       <div class="settlement-list" id="settlement-list"></div>
     </details>
-    <footer class="footer">工时按实际时长计算 · 用餐扣除 30 分钟 · 数据仅保存在当前浏览器</footer>
+    <footer class="footer">工时按实际时长计算 · 用餐扣除 30 分钟 · 登录后记录保存在云端</footer>
+    </div>
   </main>
 
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     (() => {
       const HOURLY_RATE = 15;
       const STORAGE_KEY = "daily-work-data-v2";
       const LEGACY_STORAGE_KEY = "daily-work-records-v1";
       const BACKGROUND_DB = "daily-work-background-v1";
+      const SUPABASE_CONFIG = window.WORK_LOG_SUPABASE_CONFIG || {};
+      const SUPABASE_URL = SUPABASE_CONFIG.url;
+      const SUPABASE_ANON_KEY = SUPABASE_CONFIG.anonKey || "";
+      const CLOUD_TABLE = "work_log_data";
       const form = document.querySelector("#work-form");
       const dateInput = document.querySelector("#work-date");
       const startInput = document.querySelector("#start-time");
@@ -280,6 +320,18 @@
       const mealInput = document.querySelector("#meal");
       const recordsElement = document.querySelector("#records");
       const messageElement = document.querySelector("#form-message");
+      const authPanel = document.querySelector("#auth-panel");
+      const authMessage = document.querySelector("#auth-message");
+      const appContent = document.querySelector("#app-content");
+      const authForm = document.querySelector("#auth-form");
+      const signInButton = document.querySelector("#sign-in-button");
+      const signUpButton = document.querySelector("#sign-up-button");
+      const isConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.startsWith("PASTE_"));
+      const supabase = isConfigured && window.supabase
+        ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+        : null;
+      let currentUser = null;
+      let loadingUserId = null;
 
       const today = new Date();
       dateInput.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -296,7 +348,7 @@
           if (!Array.isArray(legacyRecords)) throw new Error("旧版工时记录格式不正确。");
           return { records: legacyRecords, settlements: [] };
         } catch (error) {
-          messageElement.textContent = `读取记录失败：${error.message}`;
+          authMessage.textContent = `读取本机旧记录失败：${error.message}`;
           return { records: [], settlements: [] };
         }
       }
@@ -365,8 +417,8 @@
           remove.type = "button";
           remove.setAttribute("aria-label", `删除${formatDate(record.date)}的记录`);
           remove.textContent = "×";
-          remove.addEventListener("click", () => {
-            saveRecords(records.filter((item) => item.date !== record.date));
+          remove.addEventListener("click", async () => {
+            await saveRecords(records.filter((item) => item.date !== record.date));
           });
           right.append(remove);
         }
@@ -444,22 +496,195 @@
         });
       }
 
-      function saveRecords(nextRecords, nextSettlements = settlements) {
+      function cacheData(nextRecords, nextSettlements) {
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify({ records: nextRecords, settlements: nextSettlements }));
-          records = nextRecords;
-          settlements = nextSettlements;
-          messageElement.textContent = "";
-          render();
-          return true;
         } catch (error) {
-          messageElement.textContent = `保存失败：${error.message}`;
-          return false;
+          messageElement.textContent = `云端已保存，但本机缓存失败：${error.message}`;
         }
       }
 
+      function normalizedData(data) {
+        return {
+          records: data.records.slice().sort((a, b) => a.date.localeCompare(b.date)),
+          settlements: data.settlements.slice().sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))
+        };
+      }
+
+      function dataFingerprint(data) {
+        return JSON.stringify(normalizedData(data));
+      }
+
+      async function saveRecords(nextRecords, nextSettlements = settlements) {
+        if (!supabase || !currentUser) {
+          messageElement.textContent = "请先登录，记录才能保存到云端。";
+          return false;
+        }
+        const payload = { records: nextRecords, settlements: nextSettlements };
+        try {
+          const { error } = await supabase.from(CLOUD_TABLE).upsert({
+            user_id: currentUser.id,
+            payload,
+            updated_at: new Date().toISOString()
+          });
+          if (error) throw error;
+        } catch (error) {
+          messageElement.textContent = `云端保存失败：${error.message}`;
+          return false;
+        }
+        records = nextRecords;
+        settlements = nextSettlements;
+        cacheData(records, settlements);
+        if (!messageElement.textContent.startsWith("云端已保存")) messageElement.textContent = "";
+        render();
+        return true;
+      }
+
+      function showSignedOut(message = "") {
+        currentUser = null;
+        loadingUserId = null;
+        appContent.hidden = true;
+        authPanel.hidden = false;
+        authMessage.textContent = message;
+        if (supabase) {
+          signInButton.disabled = false;
+          signUpButton.disabled = false;
+        }
+      }
+
+      async function loadCloudData(user) {
+        if (!supabase || loadingUserId === user.id) return;
+        loadingUserId = user.id;
+        currentUser = user;
+        authMessage.textContent = "正在读取云端记录…";
+        signInButton.disabled = true;
+        signUpButton.disabled = true;
+        try {
+          const localData = readData();
+          const { data, error } = await supabase
+            .from(CLOUD_TABLE)
+            .select("payload")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          if (error) throw error;
+
+          if (data) {
+            const cloudData = data.payload;
+            if (!cloudData || !Array.isArray(cloudData.records) || !Array.isArray(cloudData.settlements)) {
+              throw new Error("云端数据格式不正确，原有数据未修改。");
+            }
+            const hasLocalData = localData.records.length > 0 || localData.settlements.length > 0;
+            if (hasLocalData && dataFingerprint(localData) !== dataFingerprint(cloudData)
+              && window.confirm("这台设备还有不同于云端的本机记录。确定将本机记录合并到云端吗？同一天的记录以云端为准。")) {
+              const mergedRecords = new Map(localData.records.map((record) => [record.date, record]));
+              cloudData.records.forEach((record) => mergedRecords.set(record.date, record));
+              const settlementMap = new Map();
+              [...localData.settlements, ...cloudData.settlements].forEach((settlement) => {
+                settlementMap.set(JSON.stringify(settlement), settlement);
+              });
+              records = Array.from(mergedRecords.values());
+              settlements = Array.from(settlementMap.values());
+              if (!await saveRecords(records, settlements)) throw new Error(messageElement.textContent);
+            } else {
+              records = cloudData.records;
+              settlements = cloudData.settlements;
+            }
+          } else {
+            records = localData.records;
+            settlements = localData.settlements;
+            const { error: saveError } = await supabase.from(CLOUD_TABLE).upsert({
+              user_id: user.id,
+              payload: { records, settlements },
+              updated_at: new Date().toISOString()
+            });
+            if (saveError) throw saveError;
+            cacheData(records, settlements);
+          }
+
+          currentUser = user;
+          document.querySelector("#account-email").textContent = `已同步：${user.email || "当前账号"}`;
+          authPanel.hidden = true;
+          appContent.hidden = false;
+          authMessage.textContent = "";
+          messageElement.textContent = "";
+          render();
+        } catch (error) {
+          showSignedOut(`读取云端失败：${error.message}`);
+        }
+      }
+
+      async function submitAuth(mode) {
+        if (!supabase) {
+          authMessage.textContent = isConfigured
+            ? "Supabase 客户端加载失败，请检查网络后刷新页面。"
+            : "请先在 supabase-config.js 中填入 Supabase 的公开 anon/publishable key，再发布页面。";
+          return;
+        }
+        const email = document.querySelector("#auth-email").value.trim();
+        const password = document.querySelector("#auth-password").value;
+        authMessage.textContent = mode === "signup" ? "正在创建账号…" : "正在登录…";
+        signInButton.disabled = true;
+        signUpButton.disabled = true;
+        const result = mode === "signup"
+          ? await supabase.auth.signUp({ email, password })
+          : await supabase.auth.signInWithPassword({ email, password });
+        if (result.error) {
+          authMessage.textContent = `账号操作失败：${result.error.message}`;
+          signInButton.disabled = false;
+          signUpButton.disabled = false;
+        } else if (mode === "signup" && !result.data.session) {
+          authMessage.textContent = "注册成功。请先到邮箱查收验证邮件，完成验证后再登录。";
+          signInButton.disabled = false;
+          signUpButton.disabled = false;
+        } else if (result.data.session) {
+          await loadCloudData(result.data.session.user);
+        }
+      }
+
+      authForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        submitAuth("signin").catch((error) => {
+          authMessage.textContent = `登录失败：${error.message}`;
+          signInButton.disabled = false;
+          signUpButton.disabled = false;
+        });
+      });
+      signUpButton.addEventListener("click", () => {
+        if (!authForm.reportValidity()) return;
+        submitAuth("signup").catch((error) => {
+          authMessage.textContent = `注册失败：${error.message}`;
+          signInButton.disabled = false;
+          signUpButton.disabled = false;
+        });
+      });
+      document.querySelector("#sign-out-button").addEventListener("click", async () => {
+        const { error } = await supabase.auth.signOut();
+        if (error) messageElement.textContent = `退出失败：${error.message}`;
+        else showSignedOut();
+      });
+
+      if (!supabase) {
+        signInButton.disabled = true;
+        signUpButton.disabled = true;
+        authMessage.textContent = isConfigured
+          ? "Supabase 客户端加载失败，请检查网络后刷新页面。"
+          : "页面已准备好云端保存；在 supabase-config.js 填入公开 anon/publishable key 并发布后即可注册登录。";
+      } else {
+        supabase.auth.onAuthStateChange((event, session) => {
+          if (session) {
+            setTimeout(() => loadCloudData(session.user), 0);
+          } else if (event === "SIGNED_OUT") {
+            showSignedOut();
+          }
+        });
+        supabase.auth.getSession().then(({ data, error }) => {
+          if (error) showSignedOut(`登录状态读取失败：${error.message}`);
+          else if (data.session) loadCloudData(data.session.user);
+        }).catch((error) => showSignedOut(`登录状态读取失败：${error.message}`));
+      }
+
       [startInput, endInput, mealInput].forEach((input) => input.addEventListener("input", updatePreview));
-      form.addEventListener("submit", (event) => {
+      form.addEventListener("submit", async (event) => {
         event.preventDefault();
         messageElement.textContent = "";
         if (!dateInput.value || !startInput.value || !endInput.value) {
@@ -476,21 +701,21 @@
         if (existing && !window.confirm("这一天已有记录，保存后会替换原记录。要继续吗？")) return;
         const nextRecords = records.filter((record) => record.date !== dateInput.value);
         nextRecords.push({ date: dateInput.value, start: startInput.value, end: endInput.value, meal: mealInput.checked, minutes });
-        if (!saveRecords(nextRecords)) return;
+        if (!await saveRecords(nextRecords)) return;
         startInput.value = "";
         endInput.value = "";
         mealInput.checked = false;
         updatePreview();
       });
 
-      document.querySelector("#settle-button").addEventListener("click", () => {
+      document.querySelector("#settle-button").addEventListener("click", async () => {
         if (records.length === 0) return;
         const totalMinutes = records.reduce((sum, record) => sum + record.minutes, 0);
         const totalPay = (totalMinutes / 60 * HOURLY_RATE).toFixed(2);
         if (!window.confirm(`确认结算本期 ${records.length} 天，合计 ${formatDuration(totalMinutes)}、工资 ¥${totalPay}？\n确认后本期会存入历史结算，当前累计将清零。`)) return;
         const todayDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
         const settlement = { settledAt: todayDate, minutes: totalMinutes, records: records.slice() };
-        if (saveRecords([], [settlement, ...settlements])) {
+        if (await saveRecords([], [settlement, ...settlements])) {
           document.querySelector(".settlement-history").open = true;
           messageElement.textContent = "本期已结算并保存，已开始新一轮记录。";
         }
