@@ -130,14 +130,17 @@
     .record-date { font-size: 13px; font-weight: 650; }
     .record-detail { margin-top: 6px; color: var(--muted); font-size: 11px; }
     .record-right { display: flex; align-items: center; gap: 12px; }
-    .record-actions { display: flex; align-items: center; gap: 4px; }
+    .record-actions { position: relative; display: flex; align-items: center; }
+    .record-menu-trigger { display: grid; width: 34px; height: 34px; place-items: center; border: 0; border-radius: 9px; color: var(--muted); background: transparent; font-size: 22px; line-height: 1; }
+    .record-menu-trigger:hover, .record-menu-trigger[aria-expanded="true"] { color: var(--ink); background: rgba(255,255,255,.72); }
+    .record-menu { position: absolute; z-index: 5; top: calc(100% + 5px); right: 0; display: grid; min-width: 112px; gap: 3px; padding: 5px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.96); box-shadow: 0 10px 25px rgba(31,43,33,.14); }
+    .record-menu[hidden] { display: none; }
+    .record-menu button { min-height: 36px; padding: 0 10px; border: 0; border-radius: 7px; color: var(--ink); background: transparent; font-size: 12px; text-align: left; }
+    .record-menu button:hover { background: #f2f5ef; }
+    .record-menu .record-delete-action { color: #a24035; }
     .record-total { text-align: right; white-space: nowrap; }
     .record-total strong { display: block; font-size: 14px; }
     .record-total small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
-    .delete-button { width: 30px; height: 30px; border: 0; border-radius: 8px; color: #8c918b; background: transparent; font-size: 18px; }
-    .delete-button:hover { color: #a24035; background: #fbefed; }
-    .edit-button { min-height: 32px; padding: 0 9px; border: 0; border-radius: 8px; color: var(--accent); background: rgba(57,107,80,.08); font-size: 12px; }
-    .edit-button:hover { background: rgba(57,107,80,.15); }
     .cancel-edit-button { width: 100%; min-height: 40px; margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: rgba(255,255,255,.45); }
     .empty { padding: 50px 10px; color: var(--muted); text-align: center; font-size: 13px; }
     .empty-icon { margin-bottom: 10px; font-size: 26px; }
@@ -480,23 +483,46 @@
         if (allowDelete) {
           const actions = document.createElement("div");
           actions.className = "record-actions";
+          const menuTrigger = document.createElement("button");
+          menuTrigger.className = "record-menu-trigger";
+          menuTrigger.type = "button";
+          menuTrigger.textContent = "⋯";
+          menuTrigger.setAttribute("aria-label", `${formatDate(record.date)}的更多操作`);
+          menuTrigger.setAttribute("aria-expanded", "false");
+          const menu = document.createElement("div");
+          menu.className = "record-menu";
+          menu.hidden = true;
+
           const edit = document.createElement("button");
-          edit.className = "edit-button";
           edit.type = "button";
           edit.textContent = "编辑";
-          edit.setAttribute("aria-label", `编辑${formatDate(record.date)}的记录`);
-          edit.addEventListener("click", () => editRecord(record));
+          edit.addEventListener("click", () => {
+            menu.hidden = true;
+            menuTrigger.setAttribute("aria-expanded", "false");
+            editRecord(record);
+          });
+
           const remove = document.createElement("button");
-          remove.className = "delete-button";
+          remove.className = "record-delete-action";
           remove.type = "button";
-          remove.setAttribute("aria-label", `删除${formatDate(record.date)}的记录`);
-          remove.textContent = "×";
+          remove.textContent = "删除";
           remove.addEventListener("click", async () => {
+            menu.hidden = true;
+            menuTrigger.setAttribute("aria-expanded", "false");
             if (await saveRecords(records.filter((item) => item.date !== record.date)) && editingDate === record.date) {
               clearEditing();
             }
           });
-          actions.append(edit, remove);
+
+          menu.append(edit, remove);
+          menuTrigger.addEventListener("click", () => {
+            const isOpening = menu.hidden;
+            recordsElement.querySelectorAll(".record-menu").forEach((item) => { item.hidden = true; });
+            recordsElement.querySelectorAll(".record-menu-trigger").forEach((item) => item.setAttribute("aria-expanded", "false"));
+            menu.hidden = !isOpening;
+            menuTrigger.setAttribute("aria-expanded", String(isOpening));
+          });
+          actions.append(menuTrigger, menu);
           right.append(actions);
         }
 
@@ -1052,10 +1078,18 @@
 
       document.addEventListener("click", (event) => {
         if (!event.target.closest(".settings-menu")) closeSettingsMenu();
+        if (!event.target.closest(".record-actions")) {
+          recordsElement.querySelectorAll(".record-menu").forEach((menu) => { menu.hidden = true; });
+          recordsElement.querySelectorAll(".record-menu-trigger").forEach((trigger) => trigger.setAttribute("aria-expanded", "false"));
+        }
       });
 
       document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") closeSettingsMenu();
+        if (event.key === "Escape") {
+          closeSettingsMenu();
+          recordsElement.querySelectorAll(".record-menu").forEach((menu) => { menu.hidden = true; });
+          recordsElement.querySelectorAll(".record-menu-trigger").forEach((trigger) => trigger.setAttribute("aria-expanded", "false"));
+        }
       });
 
       function applyBackground(blob) {
