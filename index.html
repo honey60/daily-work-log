@@ -150,6 +150,9 @@
       header { margin-bottom: 25px; }
       .brand { gap: 10px; }
       .brand-mark { width: 40px; height: 40px; }
+      .account-bar { align-items: stretch; flex-direction: column; gap: 10px; margin-bottom: 17px; }
+      .account-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+      .account-actions .backup-button, .account-actions .signout-button { min-width: 0; padding: 0 6px; font-size: 11px; white-space: nowrap; }
       .intro { margin-bottom: 18px; }
       .eyebrow { margin-bottom: 6px; }
       .intro h2 { font-size: clamp(23px, 6.5vw, 28px); }
@@ -168,7 +171,10 @@
       .fields { gap: 13px 10px; }
       .preview { margin: 14px 0; }
       .records { gap: 4px; }
-      .record { padding: 12px 0; }
+      .record { align-items: flex-start; padding: 14px 0; }
+      .record-right { gap: 7px; }
+      .record-actions { margin-top: -3px; }
+      .record-detail { line-height: 1.5; }
       .empty { padding: 26px 10px; }
       .footer { margin-top: 16px; line-height: 1.6; }
     }
