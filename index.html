@@ -577,6 +577,20 @@
         return JSON.stringify(normalizedData(data));
       }
 
+      function recordFromLegacyRow(row) {
+        if (!row.start_time || !row.end_time) return null;
+        const start = new Date(row.start_time);
+        const end = new Date(row.end_time);
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+        let minutes = Math.round((end.getTime() - start.getTime()) / 60000);
+        if (minutes <= 0) minutes += 24 * 60;
+        const meal = /meal|用餐|吃饭/i.test(row.remark || "");
+        if (meal) minutes = Math.max(0, minutes - 30);
+        const localDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
+        const localTime = (date) => `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+        return { date: localDate, start: localTime(start), end: localTime(end), meal, minutes };
+      }
+
       async function saveRecords(nextRecords, nextSettlements = settlements) {
         if (!supabase || !currentUser) {
           messageElement.textContent = "请先登录，记录才能保存到云端。";
@@ -584,12 +598,21 @@
         }
         const payload = { records: nextRecords, settlements: nextSettlements };
         try {
-          const { error } = await supabase.from(CLOUD_TABLE).upsert({
+          const row = {
             user_id: currentUser.id,
             payload,
             updated_at: new Date().toISOString()
-          });
+          };
+          const { data, error } = await supabase
+            .from(CLOUD_TABLE)
+            .update(row)
+            .eq("user_id", currentUser.id)
+            .select("id");
           if (error) throw error;
+          if (data.length === 0) {
+            const { error: insertError } = await supabase.from(CLOUD_TABLE).insert(row);
+            if (insertError) throw insertError;
+          }
         } catch (error) {
           messageElement.textContent = `云端保存失败：${error.message}`;
           return false;
@@ -628,14 +651,35 @@
           const localData = readData();
           const { data, error } = await supabase
             .from(CLOUD_TABLE)
-            .select("payload")
+            .select("payload,updated_at,start_time,end_time,remark")
             .eq("user_id", user.id)
-            .maybeSingle();
+            .order("updated_at", { ascending: true });
           if (error) throw error;
 
-          if (data) {
-            const cloudData = data.payload;
-            if (!cloudData || !Array.isArray(cloudData.records) || !Array.isArray(cloudData.settlements)) {
+          if (data.length > 0) {
+            const cloudRecords = new Map();
+            const cloudSettlements = new Map();
+            let importedLegacyRecords = false;
+            data.forEach((row) => {
+              const legacyRecord = recordFromLegacyRow(row);
+              if (legacyRecord) {
+                cloudRecords.set(legacyRecord.date, legacyRecord);
+                importedLegacyRecords = true;
+              }
+            });
+            data.forEach((row) => {
+              const cloudData = row.payload;
+              if (!cloudData || !Array.isArray(cloudData.records) || !Array.isArray(cloudData.settlements)) {
+                throw new Error("云端数据格式不正确，原有数据未修改。");
+              }
+              cloudData.records.forEach((record) => cloudRecords.set(record.date, record));
+              cloudData.settlements.forEach((settlement) => cloudSettlements.set(JSON.stringify(settlement), settlement));
+            });
+            const cloudData = {
+              records: Array.from(cloudRecords.values()),
+              settlements: Array.from(cloudSettlements.values())
+            };
+            if (!Array.isArray(cloudData.records) || !Array.isArray(cloudData.settlements)) {
               throw new Error("云端数据格式不正确，原有数据未修改。");
             }
             const hasLocalData = localData.records.length > 0 || localData.settlements.length > 0;
@@ -653,6 +697,9 @@
             } else {
               records = cloudData.records;
               settlements = cloudData.settlements;
+            }
+            if (importedLegacyRecords && !await saveRecords(records, settlements)) {
+              throw new Error(messageElement.textContent);
             }
           } else {
             records = localData.records;
@@ -675,9 +722,13 @@
           render();
         } catch (error) {
           const message = String(error.message || "");
-          showSignedOut(message.includes("work_log_data.payload") || message.includes("column payload")
-            ? "数据库缺少 payload 字段。请在 Supabase SQL Editor 重新运行项目中的 supabase-schema.sql，再刷新本页登录。原有记录未删除。"
-            : `读取云端失败：${message}`);
+          if (message.includes("multiple (or no) rows returned")) {
+            showSignedOut("数据库中这个账号有多行记录。为避免丢失历史工时，请先检查 work_log_data 表结构，不要删除重复行或重跑建表脚本。");
+          } else if (message.includes("work_log_data.payload") || message.includes("column payload")) {
+            showSignedOut("数据库缺少 payload 字段。请在 Supabase SQL Editor 重新运行项目中的 supabase-schema.sql，再刷新本页登录。原有记录未删除。");
+          } else {
+            showSignedOut(`读取云端失败：${message}`);
+          }
         }
       }
 
