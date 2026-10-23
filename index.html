@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f4ef">
+  <meta name="theme-color" content="#eef5f8">
   <title>今日工时 · 兼职记工</title>
   <style>
     :root {
       color-scheme: light;
-      --ink: #20251f;
-      --muted: #777d73;
-      --accent: #396b50;
-      --accent-dark: #28513b;
-      --paper: rgba(255, 255, 255, .42);
+      --ink: #1d2830;
+      --muted: #53636d;
+      --accent: #286b8e;
+      --accent-dark: #1d506d;
+      --paper: rgba(255, 255, 255, .82);
       --line: rgba(32, 37, 31, .12);
       --shadow: 0 18px 45px rgba(31, 43, 33, .08);
     }
@@ -30,12 +30,12 @@
       inset: 0;
       content: "";
       background-color: #f3f2ec;
-      background-image: linear-gradient(rgba(248, 248, 242, .2), rgba(248, 248, 242, .24)), url("default-background.png");
+      background-image: linear-gradient(rgba(248, 250, 252, .62), rgba(248, 250, 252, .68)), url("default-background.png");
       background-position: center;
       background-size: cover;
       background-attachment: fixed;
     }
-    body.has-background::before { background-image: linear-gradient(rgba(248, 248, 242, .12), rgba(248, 248, 242, .18)), var(--custom-background); }
+    body.has-background::before { background-image: linear-gradient(rgba(248, 250, 252, .52), rgba(248, 250, 252, .6)), var(--custom-background); }
     button, input { font: inherit; }
     button { cursor: pointer; }
     .shell { width: min(1050px, calc(100% - 40px)); margin: 0 auto; padding: 44px 0 56px; }
@@ -83,17 +83,17 @@
     .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 15px 12px; }
     .field { min-width: 0; }
     .field.date-field { grid-column: 1 / -1; }
-    .field label { display: block; margin-bottom: 7px; color: #555d53; font-size: 12px; font-weight: 600; }
+    .field label { display: block; margin-bottom: 7px; color: #445660; font-size: 12px; font-weight: 600; }
     .field input[type="date"], .field input[type="time"] {
       width: 100%; height: 44px; padding: 0 11px; border: 1px solid var(--line); border-radius: 10px;
       outline: none; color: var(--ink); background: rgba(255,255,255,.28);
     }
-    .field input:focus { border-color: #6b9879; box-shadow: 0 0 0 3px rgba(57,107,80,.1); }
+    .field input:focus { border-color: #5790ad; box-shadow: 0 0 0 3px rgba(40,107,142,.12); }
     .meal-option {
       display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px;
       grid-column: 1 / -1;
       border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.24);
-      color: #424940; font-size: 13px; cursor: pointer;
+      color: #354751; font-size: 13px; cursor: pointer;
     }
     .meal-option input { width: 16px; height: 16px; accent-color: var(--accent); }
     .meal-option span { flex: 1; }
@@ -104,13 +104,13 @@
     .preview strong { font-size: 15px; }
     .save-button { width: 100%; height: 46px; border: 0; border-radius: 11px; color: white; background: var(--accent); font-weight: 650; transition: background .2s, transform .2s; }
     .save-button:hover { background: var(--accent-dark); transform: translateY(-1px); }
-    .save-button:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid rgba(57,107,80,.3); outline-offset: 2px; }
+    .save-button:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid rgba(40,107,142,.3); outline-offset: 2px; }
     .message { min-height: 18px; margin: 10px 0 0; color: #a24035; font-size: 12px; }
     .auth-panel { max-width: 460px; margin: 0 auto 24px; padding: 22px; border: 1px solid rgba(255,255,255,.58); border-radius: 18px; background: var(--paper); box-shadow: var(--shadow); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
     .auth-panel h2 { margin: 0 0 8px; font-size: 18px; }
     .auth-help { margin: 0 0 17px; color: var(--muted); font-size: 13px; line-height: 1.6; }
     .auth-fields { display: grid; gap: 12px; }
-    .auth-fields label { display: grid; gap: 6px; color: #555d53; font-size: 12px; font-weight: 600; }
+    .auth-fields label { display: grid; gap: 6px; color: #445660; font-size: 12px; font-weight: 600; }
     .auth-fields input { width: 100%; height: 44px; padding: 0 11px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: rgba(255,255,255,.4); }
     .auth-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 14px; }
     .auth-actions button, .signout-button { min-height: 42px; padding: 0 12px; border: 0; border-radius: 10px; color: white; background: var(--accent); font-size: 13px; font-weight: 650; }
