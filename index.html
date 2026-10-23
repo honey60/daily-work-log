@@ -626,7 +626,11 @@
         signInButton.disabled = true;
         signUpButton.disabled = true;
         const result = mode === "signup"
-          ? await supabase.auth.signUp({ email, password })
+          ? await supabase.auth.signUp({
+            email,
+            password,
+            options: { emailRedirectTo: `${window.location.origin}${window.location.pathname}` }
+          })
           : await supabase.auth.signInWithPassword({ email, password });
         if (result.error) {
           authMessage.textContent = `账号操作失败：${result.error.message}`;
