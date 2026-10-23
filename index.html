@@ -630,7 +630,10 @@
           messageElement.textContent = "";
           render();
         } catch (error) {
-          showSignedOut(`读取云端失败：${error.message}`);
+          const message = String(error.message || "");
+          showSignedOut(message.includes("work_log_data.payload") || message.includes("column payload")
+            ? "数据库缺少 payload 字段。请在 Supabase SQL Editor 重新运行项目中的 supabase-schema.sql，再刷新本页登录。原有记录未删除。"
+            : `读取云端失败：${message}`);
         }
       }
 
