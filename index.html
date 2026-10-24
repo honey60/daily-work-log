@@ -220,13 +220,22 @@
       .stat:first-child .stat-value { margin-top: 0; }
     }
     .cycle-bar {
-      display: flex; align-items: center; justify-content: space-between; gap: 14px;
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px;
       margin: 22px 0 18px; padding: 14px 17px; border: 1px solid var(--glass-border);
       border-radius: 14px; background: var(--paper); box-shadow: var(--shadow);
       backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
     }
+    .cycle-copy { grid-column: 1 / -1; }
     .cycle-copy strong { display: block; font-size: 13px; }
     .cycle-copy small { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; }
+    .settlement-date-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .settlement-date-fields label { display: grid; gap: 6px; color: #445660; font-size: 11px; font-weight: 600; }
+    .settlement-date-fields input {
+      width: 100%; min-width: 0; height: 40px; padding: 0 9px; border: 1px solid #8396a0;
+      border-radius: 9px; outline: none; color: #17252d; background: #fff; color-scheme: light;
+    }
+    .settlement-date-fields input:focus { border-color: #5790ad; box-shadow: 0 0 0 3px rgba(40,107,142,.12); }
+    .settlement-preview { grid-column: 1 / -1; min-height: 16px; margin: 0; color: var(--muted); font-size: 11px; }
     .settle-button {
       flex: 0 0 auto; min-height: 38px; padding: 0 13px; border: 0; border-radius: 10px;
       font-size: 12px; font-weight: 650;
@@ -257,7 +266,8 @@
     .settlement .delete-button { display: none; }
     .settlement-empty { padding: 16px 0 8px; color: var(--muted); font-size: 12px; }
     @media (max-width: 720px) {
-      .cycle-bar { align-items: flex-start; margin-bottom: 14px; padding: 13px; }
+      .cycle-bar { grid-template-columns: 1fr; margin-bottom: 14px; padding: 13px; }
+      .settle-button { width: 100%; }
       .cycle-copy small { max-width: 190px; line-height: 1.5; }
       .settle-button { min-height: 40px; }
       .settlement-history { margin-top: 14px; }
@@ -359,9 +369,14 @@
         <div class="records" id="records"></div>
       </section>
     </div>
-    <section class="cycle-bar" aria-label="结算当前周期">
-      <div class="cycle-copy"><strong>当前结算周期</strong><small>结算后保存本期记录，并从零开始累计</small></div>
-      <button class="settle-button" id="settle-button" type="button" disabled>结算本期</button>
+    <section class="cycle-bar" aria-label="选择结算周期">
+      <div class="cycle-copy"><strong>选择结算周期</strong><small>只结算所选日期范围内的记录，范围外记录会保留</small></div>
+      <div class="settlement-date-fields">
+        <label for="settlement-start-date">开始日期<input id="settlement-start-date" type="date"></label>
+        <label for="settlement-end-date">结束日期<input id="settlement-end-date" type="date"></label>
+      </div>
+      <p class="settlement-preview" id="settlement-preview" aria-live="polite"></p>
+      <button class="settle-button" id="settle-button" type="button" disabled>结算所选周期</button>
     </section>
     <details class="settlement-history">
       <summary><span>历史结算</span><small id="settlement-count">0 期</small></summary>
@@ -388,6 +403,10 @@
       const startInput = document.querySelector("#start-time");
       const endInput = document.querySelector("#end-time");
       const mealInput = document.querySelector("#meal");
+      const settlementStartDateInput = document.querySelector("#settlement-start-date");
+      const settlementEndDateInput = document.querySelector("#settlement-end-date");
+      const settlementPreview = document.querySelector("#settlement-preview");
+      const settleButton = document.querySelector("#settle-button");
       const recordsElement = document.querySelector("#records");
       const messageElement = document.querySelector("#form-message");
       const saveButton = form.querySelector(".save-button");
@@ -415,6 +434,7 @@
         : null;
       let currentUser = null;
       let loadingUserId = null;
+      let settlementRangeManuallyChanged = false;
 
       const today = new Date();
       dateInput.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -468,6 +488,40 @@
       function formatDate(date) {
         const [year, month, day] = date.split("-");
         return `${year}年${Number(month)}月${Number(day)}日`;
+      }
+
+      function localDateString(date) {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      }
+
+      function updateSettlementSelection() {
+        const start = settlementStartDateInput.value;
+        const end = settlementEndDateInput.value;
+        const validRange = Boolean(start && end && start <= end);
+        const selectedRecords = validRange
+          ? records.filter((record) => record.date >= start && record.date <= end)
+          : [];
+        const totalMinutes = selectedRecords.reduce((sum, record) => sum + record.minutes, 0);
+
+        if (!start || !end) {
+          settlementPreview.textContent = "请选择开始和结束日期。";
+        } else if (start > end) {
+          settlementPreview.textContent = "结束日期不能早于开始日期。";
+        } else if (selectedRecords.length === 0) {
+          settlementPreview.textContent = "所选日期范围内没有工时记录。";
+        } else {
+          settlementPreview.textContent = `所选范围 ${selectedRecords.length} 天 · ${formatDuration(totalMinutes)} · 预计工资 ¥${(totalMinutes / 60 * HOURLY_RATE).toFixed(2)}`;
+        }
+        settleButton.disabled = selectedRecords.length === 0;
+        return selectedRecords;
+      }
+
+      function setDefaultSettlementRange() {
+        if (settlementRangeManuallyChanged) return;
+        const sortedDates = records.map((record) => record.date).sort();
+        const todayDate = localDateString(today);
+        settlementStartDateInput.value = sortedDates[0] || todayDate;
+        settlementEndDateInput.value = sortedDates[sortedDates.length - 1] || todayDate;
       }
 
       function clearEditing() {
@@ -591,7 +645,9 @@
           const endDate = dates[dates.length - 1];
           const range = document.createElement("div");
           range.className = "settlement-period";
-          range.textContent = startDate === endDate ? formatDate(startDate) : `${formatDate(startDate)} — ${formatDate(endDate)}`;
+          const periodStart = settlement.periodStart || startDate;
+          const periodEnd = settlement.periodEnd || endDate;
+          range.textContent = periodStart === periodEnd ? formatDate(periodStart) : `${formatDate(periodStart)} — ${formatDate(periodEnd)}`;
           const meta = document.createElement("div");
           meta.className = "settlement-meta";
           meta.textContent = `${settlement.records.length} 天 · ${formatDuration(settlement.minutes)} · 结算于 ${formatDate(settlement.settledAt)}`;
@@ -621,7 +677,8 @@
         document.querySelector("#total-pay").textContent = `¥${(totalMinutes / 60 * HOURLY_RATE).toFixed(2)}`;
         document.querySelector("#total-days").innerHTML = `${records.length}<small>天</small>`;
         document.querySelector("#record-count").textContent = `共 ${records.length} 条`;
-        document.querySelector("#settle-button").disabled = records.length === 0;
+        setDefaultSettlementRange();
+        updateSettlementSelection();
         recordsElement.replaceChildren();
         renderSettlements();
 
@@ -708,7 +765,11 @@
           && Number.isFinite(settlement.minutes)
           && settlement.minutes >= 0
           && Array.isArray(settlement.records)
-          && settlement.records.every(isValidRecord);
+          && settlement.records.every(isValidRecord)
+          && ((settlement.periodStart === undefined && settlement.periodEnd === undefined)
+            || (/^\d{4}-\d{2}-\d{2}$/.test(settlement.periodStart)
+              && /^\d{4}-\d{2}-\d{2}$/.test(settlement.periodEnd)
+              && settlement.periodStart <= settlement.periodEnd));
       }
 
       async function restoreBackup(file) {
@@ -1080,16 +1141,38 @@
         clearEditing();
       });
 
-      document.querySelector("#settle-button").addEventListener("click", async () => {
-        if (records.length === 0) return;
-        const totalMinutes = records.reduce((sum, record) => sum + record.minutes, 0);
+      [settlementStartDateInput, settlementEndDateInput].forEach((input) => {
+        input.addEventListener("input", () => {
+          settlementRangeManuallyChanged = true;
+          updateSettlementSelection();
+        });
+      });
+
+      settleButton.addEventListener("click", async () => {
+        const selectedRecords = updateSettlementSelection();
+        if (selectedRecords.length === 0) return;
+        const periodStart = settlementStartDateInput.value;
+        const periodEnd = settlementEndDateInput.value;
+        const remainingRecords = records.filter((record) => record.date < periodStart || record.date > periodEnd);
+        const totalMinutes = selectedRecords.reduce((sum, record) => sum + record.minutes, 0);
         const totalPay = (totalMinutes / 60 * HOURLY_RATE).toFixed(2);
-        if (!window.confirm(`确认结算本期 ${records.length} 天，合计 ${formatDuration(totalMinutes)}、工资 ¥${totalPay}？\n确认后本期会存入历史结算，当前累计将清零。`)) return;
-        const todayDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-        const settlement = { settledAt: todayDate, minutes: totalMinutes, records: records.slice() };
-        if (await saveRecords([], [settlement, ...settlements])) {
+        const periodLabel = periodStart === periodEnd
+          ? formatDate(periodStart)
+          : `${formatDate(periodStart)}至${formatDate(periodEnd)}`;
+        if (!window.confirm(`确认结算 ${periodLabel} 的 ${selectedRecords.length} 天记录，合计 ${formatDuration(totalMinutes)}、工资 ¥${totalPay}？\n所选范围外的 ${remainingRecords.length} 条记录会保留在当前累计中。`)) return;
+        const settlement = {
+          settledAt: localDateString(new Date()),
+          periodStart,
+          periodEnd,
+          minutes: totalMinutes,
+          records: selectedRecords
+        };
+        if (await saveRecords(remainingRecords, [settlement, ...settlements])) {
+          settlementRangeManuallyChanged = false;
+          setDefaultSettlementRange();
+          updateSettlementSelection();
           document.querySelector(".settlement-history").open = true;
-          messageElement.textContent = "本期已结算并保存，已开始新一轮记录。";
+          messageElement.textContent = `已结算所选周期；${remainingRecords.length ? `另有 ${remainingRecords.length} 条记录保留在当前累计中。` : "当前记录已全部结算。"}`;
         }
       });
 
