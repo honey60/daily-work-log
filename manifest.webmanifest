@@ -1,0 +1,24 @@
+{
+  "name": "今日工时 · 兼职记工",
+  "short_name": "今日工时",
+  "description": "记录上下班时间，自动计算工时和工资。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef5f8",
+  "theme_color": "#eef5f8",
+  "icons": [
+    {
+      "src": "assets/work-log-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/work-log-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#eef5f8">
   <title>今日工时 · 兼职记工</title>
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/work-log-icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/work-log-icon-192.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/work-log-icon-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
   <style>
     :root {
       color-scheme: light;
@@ -88,6 +94,10 @@
     .field input[type="date"], .field input[type="time"] {
       width: 100%; height: 44px; padding: 0 11px; border: 1px solid var(--line); border-radius: 10px;
       outline: none; color: var(--ink); background: rgba(255,255,255,.28);
+    }
+    .field input[type="time"] {
+      height: 50px; border-color: #8396a0; color: #17252d; background: #fff;
+      color-scheme: light; font-size: 18px; font-weight: 650;
     }
     .field input:focus { border-color: #5790ad; box-shadow: 0 0 0 3px rgba(40,107,142,.12); }
     .meal-option {
@@ -273,7 +283,7 @@
 
     <section class="auth-panel" id="auth-panel">
       <h2>登录后同步保存</h2>
-      <p class="auth-help">使用同一个账号，可在手机和电脑查看同一份工时记录。</p>
+      <p class="auth-help">使用同一个账号，可在手机和电脑查看同一份工时记录。此浏览器会保持登录状态；退出登录或清理浏览器数据后需要重新登录。</p>
       <form id="auth-form">
         <div class="auth-fields">
           <label for="auth-email">邮箱<input id="auth-email" type="email" autocomplete="email" required></label>
@@ -326,8 +336,8 @@
         <form id="work-form" novalidate>
           <div class="fields">
             <div class="field date-field"><label for="work-date">工作日期</label><input id="work-date" name="date" type="date" required></div>
-            <div class="field"><label for="start-time">上班时间</label><input id="start-time" name="start" type="time" required></div>
-            <div class="field"><label for="end-time">下班时间</label><input id="end-time" name="end" type="time" required></div>
+            <div class="field"><label for="start-time">上班时间</label><input id="start-time" name="start" type="time" step="60" title="点按后使用手机系统的时间选择器" required></div>
+            <div class="field"><label for="end-time">下班时间</label><input id="end-time" name="end" type="time" step="60" title="点按后使用手机系统的时间选择器" required></div>
             <label class="meal-option" for="meal">
               <input id="meal" name="meal" type="checkbox">
               <span>今天吃饭了</span>
@@ -399,7 +409,9 @@
       let recoveredUser = null;
       const isConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.startsWith("PASTE_"));
       const supabase = isConfigured && window.supabase
-        ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+        ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true }
+        })
         : null;
       let currentUser = null;
       let loadingUserId = null;
